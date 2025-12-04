@@ -1,20 +1,51 @@
-name: Build and Deploy
+name: Build, Push & Deploy
 
 on:
   push:
     branches: [ "main" ]
 
 jobs:
-  build:
+  build_and_push:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - name: Login
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
+
+      - name: Login to Docker Hub
         uses: docker/login-action@v2
         with:
           username: ${{ secrets.DOCKER_USER }}
           password: ${{ secrets.DOCKER_PASS }}
-      - name: Build and push
+
+      - name: Build and push image
         run: |
-          docker build -t yourname/mywordpress:latest -f dockerfiles/Dockerfile.wp .
-          docker push yourname/mywordpress:latest
+          IMAGE=${{ secrets.DOCKER_USER }}/mywordpress:${{ github.sha }}
+          docker build -t $IMAGE -f dockerfiles/Dockerfile.wp .
+          docker push $IMAGE
+        env:
+          DOCKER_BUILDKIT: 1
+
+      - name: Save image tag
+        run: echo "IMAGE_TAG=${{ secrets.DOCKER_USER }}/mywordpress:${{ github.sha }}" >> $GITHUB_ENV
+
+  deploy:
+    needs: build_and_push
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup kubectl
+        uses: azure/setup-kubectl@v3
+        with:
+          version: 'v1.28.0'
+
+      - name: Configure kubeconfig
+        run: |
+          echo "${{ secrets.KUBECONFIG }}" > kubeconfig
+          export KUBECONFIG=$PWD/kubeconfig
+          kubectl set image deployment/wp wp=${{ env.IMAGE_TAG }} --record
+          kubectl rollout status deployment/wp
