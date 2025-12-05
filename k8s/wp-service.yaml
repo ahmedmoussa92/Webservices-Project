@@ -1,0 +1,11 @@
+kind: Service
+apiVersion: v1
+metadata:
+  name: wp-service
+spec:
+  type: LoadBalancer
+  selector:
+    app: wp
+  ports:
+   - port: 80
+     targetPort: 80
