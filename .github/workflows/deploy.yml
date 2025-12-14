@@ -27,11 +27,17 @@ jobs:
         id: login-ecr
         uses: aws-actions/amazon-ecr-login@v2
 
-      - name: Build and push Docker image to ECR
+      - name: Build Docker image
         run: |
-          IMAGE=${{ steps.login-ecr.outputs.registry }}/wordpress:latest
-          docker build -t $IMAGE -f dockerfiles/Dockerfile.wp .
-          docker push $IMAGE
+          docker build -t wordpress:latest -f dockerfiles/Dockerfile.wp .
+
+      - name: Tag image for ECR
+        run: |
+          docker tag wordpress:latest ${{ steps.login-ecr.outputs.registry }}/wordpress:latest
+
+      - name: Push image to ECR
+        run: |
+          docker push ${{ steps.login-ecr.outputs.registry }}/wordpress:latest
 
   deploy:
     needs: build_push
@@ -51,11 +57,11 @@ jobs:
 
       - name: Deploy latest image
         run: |
-          kubectl set image deployment/wordpress \
-          wordpress=${{ needs.build_push.outputs.ecr_registry }}/wordpress:latest
+          kubectl set image deployment/wordpress wordpress=${{ needs.build_push.outputs.ecr_registry }}/wordpress:latest
 
       - name: Wait for rollout
         run: |
           kubectl rollout status deployment/wordpress
+
 
 
