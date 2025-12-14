@@ -9,6 +9,9 @@ jobs:
   build_push:
     runs-on: ubuntu-latest
 
+    outputs:
+      ecr_registry: ${{ steps.login-ecr.outputs.registry }}
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -54,8 +57,9 @@ jobs:
 
       - name: Deploy latest image
         run: |
-          kubectl set image deployment/wordpress wordpress=${{ steps.login-ecr.outputs.registry }}/wordpress:latest
+          kubectl set image deployment/wordpress wordpress=${{ needs.build_push.outputs.ecr_registry }}/wordpress:latest
 
       - name: Wait for rollout
         run: |
           kubectl rollout status deployment/wordpress
+
