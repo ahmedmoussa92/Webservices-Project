@@ -1,0 +1,45 @@
+name: WordPress CI/CD
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Source
+        uses: actions/checkout@v4
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: us-east-1
+
+      - name: Login to ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build Docker Image (WordPress)
+        run: |
+          docker build -t wordpress-server1:latest ./dockerfiles
+
+      - name: Tag Image
+        run: |
+          docker tag wordpress-server1:latest ${{ steps.login-ecr.outputs.registry }}/wordpress:latest
+
+      - name: Push to ECR
+        run: |
+          docker push ${{ steps.login-ecr.outputs.registry }}/wordpress:latest
+
+      - name: Update kubeconfig
+        run: |
+          aws eks update-kubeconfig --name prod-eks-cluster --region us-east-1
+
+      - name: Deploy to Kubernetes
+        run: |
+          kubectl set image deployment/wordpress wordpress=${{ steps.login-ecr.outputs.registry }}/wordpress:latest
