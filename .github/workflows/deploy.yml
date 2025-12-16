@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - main
+  workflow_dispatch:
 
 jobs:
   build_push:
@@ -62,6 +63,3 @@ jobs:
       - name: Wait for rollout
         run: |
           kubectl rollout status deployment/wordpress
-
-
-
