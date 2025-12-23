@@ -1,51 +1,65 @@
-name: Build, Push & Deploy
+name: WordPress CI/CD
 
 on:
   push:
-    branches: [ "main" ]
+    branches:
+      - main
+  workflow_dispatch:
 
 jobs:
-  build_and_push:
+  build_push:
     runs-on: ubuntu-latest
+
+    outputs:
+      ecr_registry: ${{ steps.login-ecr.outputs.registry }}
+
     steps:
-      - name: Checkout
+      - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v2
-
-      - name: Login to Docker Hub
-        uses: docker/login-action@v2
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
         with:
-          username: ${{ secrets.DOCKER_USER }}
-          password: ${{ secrets.DOCKER_PASS }}
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: us-east-1
 
-      - name: Build and push image
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build Docker image
         run: |
-          IMAGE=${{ secrets.DOCKER_USER }}/mywordpress:${{ github.sha }}
-          docker build -t $IMAGE -f dockerfiles/Dockerfile.wp .
-          docker push $IMAGE
-        env:
-          DOCKER_BUILDKIT: 1
+          docker build -t wordpress:latest -f dockerfiles/Dockerfile.wp .
 
-      - name: Save image tag
-        run: echo "IMAGE_TAG=${{ secrets.DOCKER_USER }}/mywordpress:${{ github.sha }}" >> $GITHUB_ENV
+      - name: Tag image for ECR
+        run: |
+          docker tag wordpress:latest ${{ steps.login-ecr.outputs.registry }}/wordpress:latest
+
+      - name: Push image to ECR
+        run: |
+          docker push ${{ steps.login-ecr.outputs.registry }}/wordpress:latest
 
   deploy:
-    needs: build_and_push
+    needs: build_push
     runs-on: ubuntu-latest
+
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Setup kubectl
-        uses: azure/setup-kubectl@v3
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
         with:
-          version: 'v1.28.0'
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: us-east-1
 
-      - name: Configure kubeconfig
+      - name: Update kubeconfig for EKS
         run: |
-          echo "${{ secrets.KUBECONFIG }}" > kubeconfig
-          export KUBECONFIG=$PWD/kubeconfig
-          kubectl set image deployment/wp wp=${{ env.IMAGE_TAG }} --record
-          kubectl rollout status deployment/wp
+          aws eks update-kubeconfig --name prod-eks-cluster --region us-east-1
+
+      - name: Deploy latest image
+        run: |
+          kubectl set image deployment/wordpress wordpress=${{ needs.build_push.outputs.ecr_registry }}/wordpress:latest
+
+      - name: Wait for rollout
+        run: |
+          kubectl rollout status deployment/wordpress
