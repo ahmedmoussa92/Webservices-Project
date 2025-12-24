@@ -4,6 +4,12 @@ on:
   push:
     branches:
       - main
+    paths:
+      - "dockerfiles/**"
+      - "nginx-app/**"
+      - "nginx-data/**"
+      - "k8s/**"
+      - ".github/workflows/deploy.yml"
   workflow_dispatch:
 
 jobs:
@@ -34,11 +40,13 @@ jobs:
 
       - name: Tag image for ECR
         run: |
-          docker tag wordpress:latest ${{ steps.login-ecr.outputs.registry }}/wordpress:latest
+          docker tag wordpress:latest \
+          ${{ steps.login-ecr.outputs.registry }}/wordpress:latest
 
       - name: Push image to ECR
         run: |
-          docker push ${{ steps.login-ecr.outputs.registry }}/wordpress:latest
+          docker push \
+          ${{ steps.login-ecr.outputs.registry }}/wordpress:latest
 
   deploy:
     needs: build_push
@@ -54,12 +62,5 @@ jobs:
 
       - name: Update kubeconfig for EKS
         run: |
-          aws eks update-kubeconfig --name prod-eks-cluster --region us-east-1
-
-      - name: Deploy latest image
-        run: |
-          kubectl set image deployment/wordpress wordpress=${{ needs.build_push.outputs.ecr_registry }}/wordpress:latest
-
-      - name: Wait for rollout
-        run: |
-          kubectl rollout status deployment/wordpress
+          aws eks update-kubeconfig \
+            --name prod-eks-cluster \
