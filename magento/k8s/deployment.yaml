@@ -4,7 +4,7 @@ metadata:
   name: magento
   namespace: magento
 spec:
-  replicas: 2
+  replicas: 1
   selector:
     matchLabels:
       app: magento
@@ -15,9 +15,6 @@ spec:
     spec:
       containers:
         - name: magento
-          image: <AWS_ACCOUNT_ID>.dkr.ecr.us-east-1.amazonaws.com/magento-app:latest
+          image: 123456789012.dkr.ecr.us-east-1.amazonaws.com/magento-app:latest
           ports:
             - containerPort: 80
-          env:
-            - name: MAGENTO_MODE
-              value: production
