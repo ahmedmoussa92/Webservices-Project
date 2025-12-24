@@ -27,14 +27,14 @@ jobs:
 
       - name: Build Docker image
         run: |
-          docker build -t magento-app -f dockerfiles/Dockerfile .
+          docker build -t magento-app:latest ./magento
 
       - name: Tag Docker image
         run: |
-          docker tag magento-app:latest `
+          docker tag magento-app:latest \
           ${{ steps.login-ecr.outputs.registry }}/${{ secrets.ECR_REPOSITORY }}:latest
 
       - name: Push Docker image to ECR
         run: |
-          docker push `
+          docker push \
           ${{ steps.login-ecr.outputs.registry }}/${{ secrets.ECR_REPOSITORY }}:latest
