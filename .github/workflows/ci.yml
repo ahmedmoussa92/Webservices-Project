@@ -4,7 +4,9 @@ on:
   push:
     branches:
       - main
-  pull_request:
+    paths:
+      - "magento/**"
+      - ".github/workflows/ci.yml"
 
 jobs:
   build:
@@ -25,16 +27,16 @@ jobs:
         id: login-ecr
         uses: aws-actions/amazon-ecr-login@v2
 
-      - name: Build Docker image
+      - name: Build Magento Docker image
         run: |
           docker build -t magento-app:latest ./magento
 
       - name: Tag Docker image
         run: |
           docker tag magento-app:latest \
-          ${{ steps.login-ecr.outputs.registry }}/${{ secrets.ECR_REPOSITORY }}:latest
+          ${{ steps.login-ecr.outputs.registry }}/magento-app:latest
 
-      - name: Push Docker image to ECR
+      - name: Push Docker image
         run: |
           docker push \
-          ${{ steps.login-ecr.outputs.registry }}/${{ secrets.ECR_REPOSITORY }}:latest
+          ${{ steps.login-ecr.outputs.registry }}/magento-app:latest
