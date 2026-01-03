@@ -14,15 +14,17 @@ on:
 
 jobs:
   build_push:
-    runs-on: ubuntu-latest   # ✅ fix typo here
+    runs-on: ubuntu-latest
 
     outputs:
       ecr_registry: ${{ steps.login-ecr.outputs.registry }}
 
     steps:
+      # 1️⃣ Checkout code
       - name: Checkout code
         uses: actions/checkout@v4
 
+      # 2️⃣ Configure AWS credentials
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
@@ -30,17 +32,21 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: us-east-1
 
+      # 3️⃣ Login to Amazon ECR
       - name: Login to Amazon ECR
         id: login-ecr
         uses: aws-actions/amazon-ecr-login@v2
 
+      # 4️⃣ Build WordPress Docker image
       - name: Build WordPress Docker image
         run: docker build -t wordpress:latest -f dockerfiles/Dockerfile.wp .
 
-      - name: Tag image for ECR
+      # 5️⃣ Tag image for ECR
+      - name: Tag Docker image
         run: docker tag wordpress:latest ${{ steps.login-ecr.outputs.registry }}/wordpress:latest
 
-      - name: Push image to ECR
+      # 6️⃣ Push image to ECR
+      - name: Push Docker image
         run: docker push ${{ steps.login-ecr.outputs.registry }}/wordpress:latest
 
   deploy:
@@ -48,6 +54,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+      # 1️⃣ Configure AWS credentials for deployment
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
@@ -55,9 +62,11 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: us-east-1
 
+      # 2️⃣ Update EKS kubeconfig
       - name: Update kubeconfig for EKS
         run: aws eks update-kubeconfig --name prod-eks-cluster --region us-east-1
 
+      # 3️⃣ Deploy WordPress container
       - name: Deploy WordPress container
         run: |
           kubectl set image deployment/wordpress wordpress=${{ steps.login-ecr.outputs.registry }}/wordpress:latest
