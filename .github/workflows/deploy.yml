@@ -20,11 +20,9 @@ jobs:
       ecr_registry: ${{ steps.login-ecr.outputs.registry }}
 
     steps:
-      # 1️⃣ Checkout repository code
       - name: Checkout code
         uses: actions/checkout@v4
 
-      # 2️⃣ Configure AWS credentials
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
@@ -32,53 +30,43 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: us-east-1
 
-      # 3️⃣ Login to Amazon ECR
       - name: Login to Amazon ECR
         id: login-ecr
         uses: aws-actions/amazon-ecr-login@v2
         with:
           registry-ids: ${{ secrets.ECR_REGISTRY_ID }}
 
-      # 4️⃣ Build WordPress Docker image
+      # 🔹 WordPress Build & Push
       - name: Build WordPress Docker image
         run: |
-          docker build -t wordpress:latest -f dockerfiles/Dockerfile.wp .
+          docker build -t wordpress:latest -f dockerfiles/wordpress/Dockerfile.wp ./dockerfiles/wordpress
 
-      # 5️⃣ Tag WordPress image for ECR
       - name: Tag WordPress image
         run: |
-          docker tag wordpress:latest \
-          ${{ steps.login-ecr.outputs.registry }}/wordpress:latest
+          docker tag wordpress:latest ${{ steps.login-ecr.outputs.registry }}/wordpress:latest
 
-      # 6️⃣ Push WordPress image to ECR
       - name: Push WordPress image
         run: |
-          docker push \
-          ${{ steps.login-ecr.outputs.registry }}/wordpress:latest
+          docker push ${{ steps.login-ecr.outputs.registry }}/wordpress:latest
 
-      # 7️⃣ Build Magento Docker image
+      # 🔹 Magento Build & Push
       - name: Build Magento Docker image
         run: |
-          docker build -t magento:latest -f dockerfiles/Dockerfile.magento .
+          docker build -t magento:latest -f dockerfiles/magento/Dockerfile.magento ./dockerfiles/magento
 
-      # 8️⃣ Tag Magento image for ECR
       - name: Tag Magento image
         run: |
-          docker tag magento:latest \
-          ${{ steps.login-ecr.outputs.registry }}/magento:latest
+          docker tag magento:latest ${{ steps.login-ecr.outputs.registry }}/magento:latest
 
-      # 9️⃣ Push Magento image to ECR
       - name: Push Magento image
         run: |
-          docker push \
-          ${{ steps.login-ecr.outputs.registry }}/magento:latest
+          docker push ${{ steps.login-ecr.outputs.registry }}/magento:latest
 
   deploy:
     needs: build_push
     runs-on: ubuntu-latest
 
     steps:
-      # 1️⃣ Configure AWS credentials for deploy job
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
@@ -86,21 +74,16 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: us-east-1
 
-      # 2️⃣ Update EKS kubeconfig
       - name: Update kubeconfig for EKS
         run: |
-          aws eks update-kubeconfig \
-            --name prod-eks-cluster \
-            --region us-east-1
+          aws eks update-kubeconfig --name prod-eks-cluster --region us-east-1
 
-      # 3️⃣ Deploy WordPress container
-      - name: Deploy WordPress container to EKS
+      - name: Deploy WordPress container
         run: |
           kubectl set image deployment/wordpress wordpress=${{ steps.login-ecr.outputs.registry }}/wordpress:latest
           kubectl rollout status deployment/wordpress
 
-      # 4️⃣ Deploy Magento container
-      - name: Deploy Magento container to EKS
+      - name: Deploy Magento container
         run: |
           kubectl set image deployment/magento magento=${{ steps.login-ecr.outputs.registry }}/magento:latest
           kubectl rollout status deployment/magento
