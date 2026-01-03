@@ -4,12 +4,6 @@ on:
   push:
     branches:
       - main
-    paths:
-      - "dockerfiles/**"
-      - "nginx-app/**"
-      - "nginx-data/**"
-      - "k8s/**"
-      - ".github/workflows/deploy.yml"
   workflow_dispatch:
 
 jobs:
@@ -35,13 +29,16 @@ jobs:
         uses: aws-actions/amazon-ecr-login@v2
 
       - name: Build Docker image
-        run: docker build -t wordpress:latest -f dockerfiles/Dockerfile.wp .
+        run: |
+          docker build -t wordpress:latest -f dockerfiles/Dockerfile.wp .
 
-      - name: Tag Docker image for ECR
-        run: docker tag wordpress:latest ${{ steps.login-ecr.outputs.registry }}/wordpress:latest
+      - name: Tag image for ECR
+        run: |
+          docker tag wordpress:latest ${{ steps.login-ecr.outputs.registry }}/wordpress:latest
 
-      - name: Push Docker image to ECR
-        run: docker push ${{ steps.login-ecr.outputs.registry }}/wordpress:latest
+      - name: Push image to ECR
+        run: |
+          docker push ${{ steps.login-ecr.outputs.registry }}/wordpress:latest
 
   deploy:
     needs: build_push
@@ -56,9 +53,14 @@ jobs:
           aws-region: us-east-1
 
       - name: Update kubeconfig for EKS
-        run: aws eks update-kubeconfig --name prod-eks-cluster --region us-east-1
-
-      - name: Deploy WordPress container
         run: |
-          kubectl set image deployment/wordpress wordpress=${{ steps.login-ecr.outputs.registry }}/wordpress:latest
+          aws eks update-kubeconfig --name prod-eks-cluster --region us-east-1
+
+      - name: Deploy latest image
+        run: |
+          kubectl set image deployment/wordpress wordpress=${{ needs.build_push.outputs.ecr_registry }}/wordpress:latest
+
+      - name: Wait for rollout
+        run: |
           kubectl rollout status deployment/wordpress
+
