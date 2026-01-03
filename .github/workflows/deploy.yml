@@ -1,4 +1,3 @@
-
 name: WordPress CI/CD
 
 on:
@@ -15,7 +14,7 @@ on:
 
 jobs:
   build_push:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-latest   # ✅ fix typo here
 
     outputs:
       ecr_registry: ${{ steps.login-ecr.outputs.registry }}
@@ -35,17 +34,14 @@ jobs:
         id: login-ecr
         uses: aws-actions/amazon-ecr-login@v2
 
-      - name: Build Docker image
-        run: |
-          docker build -t wordpress:latest -f dockerfiles/Dockerfile.wp .
+      - name: Build WordPress Docker image
+        run: docker build -t wordpress:latest -f dockerfiles/Dockerfile.wp .
 
       - name: Tag image for ECR
-        run: |
-          docker tag wordpress:latest ${{ steps.login-ecr.outputs.registry }}/wordpress:latest
+        run: docker tag wordpress:latest ${{ steps.login-ecr.outputs.registry }}/wordpress:latest
 
       - name: Push image to ECR
-        run: |
-          docker push ${{ steps.login-ecr.outputs.registry }}/wordpress:latest
+        run: docker push ${{ steps.login-ecr.outputs.registry }}/wordpress:latest
 
   deploy:
     needs: build_push
@@ -60,8 +56,7 @@ jobs:
           aws-region: us-east-1
 
       - name: Update kubeconfig for EKS
-        run: |
-          aws eks update-kubeconfig --name prod-eks-cluster --region us-east-1
+        run: aws eks update-kubeconfig --name prod-eks-cluster --region us-east-1
 
       - name: Deploy WordPress container
         run: |
